@@ -1,0 +1,62 @@
+name: CI Build
+
+on:
+  # 推送到主分支时自动执行，保证主线始终可编译
+  push:
+    branches:
+      - main
+  # PR 时自动执行，避免不通过的代码被合并
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build Tai.sln (Release x64)
+    runs-on: windows-latest
+
+    steps:
+      # 拉取仓库代码
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 安装 NuGet（用于 packages.config 方案的依赖恢复）
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      # 安装 Visual Studio 的 MSBuild
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # 恢复解决方案依赖
+      - name: Restore NuGet packages
+        run: nuget restore Tai.sln
+
+      # 编译整个解决方案（Release + x64）
+      - name: Build solution
+        run: msbuild Tai.sln /m /p:Configuration=Release /p:Platform=x64
+
+      # 把主程序产物打成 zip，方便在 Actions 页面直接下载体验
+      - name: Package UI build output
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $outputDir = 'UI/bin/x64/Release'
+          if (-not (Test-Path $outputDir)) {
+            throw "Build output not found: $outputDir"
+          }
+
+          $artifactDir = 'artifacts'
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+          # 压缩 UI 目录内所有内容，作为 CI 临时构建产物
+          Compress-Archive -Path "$outputDir/*" -DestinationPath "$artifactDir/Tai-ci-win-x64.zip" -Force
+
+      # 上传 CI 构建产物（短期保留即可）
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tai-ci-win-x64
+          path: artifacts/Tai-ci-win-x64.zip
+          retention-days: 7
