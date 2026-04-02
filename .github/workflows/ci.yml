@@ -4,11 +4,11 @@ on:
   # 推送到主分支时自动执行，保证主线始终可编译
   push:
     branches:
-      - main
+      - master
   # PR 时自动执行，避免不通过的代码被合并
   pull_request:
     branches:
-      - main
+      - master
 
 jobs:
   build:
