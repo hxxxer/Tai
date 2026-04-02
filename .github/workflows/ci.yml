@@ -36,27 +36,12 @@ jobs:
       - name: Build solution
         run: msbuild Tai.sln /m /p:Configuration=Release /p:Platform=x64
 
-      # 把主程序产物打成 zip，方便在 Actions 页面直接下载体验
-      - name: Package UI build output
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-
-          $outputDir = 'UI/bin/x64/Release'
-          if (-not (Test-Path $outputDir)) {
-            throw "Build output not found: $outputDir"
-          }
-
-          $artifactDir = 'artifacts'
-          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-
-          # 压缩 UI 目录内所有内容，作为 CI 临时构建产物
-          Compress-Archive -Path "$outputDir/*" -DestinationPath "$artifactDir/Tai-ci-win-x64.zip" -Force
-
       # 上传 CI 构建产物（短期保留即可）
+      # 注意：upload-artifact 下载后本身就是一个 zip。
+      # 如果这里再手动先压一次，会出现“zip 里套 zip”的体验。
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: Tai-ci-win-x64
-          path: artifacts/Tai-ci-win-x64.zip
+          path: UI/bin/x64/Release/
           retention-days: 7
