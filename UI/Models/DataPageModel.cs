@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Controls;
 using UI.Controls.Charts.Model;
 using UI.Controls.DatePickerBar;
+using UI.Controls.Select;
 
 namespace UI.Models
 {
@@ -98,5 +99,25 @@ namespace UI.Models
 
         private ContextMenu AppContextMenu_;
         public ContextMenu AppContextMenu { get { return AppContextMenu_; } set { AppContextMenu_ = value; OnPropertyChanged(); } }
+
+        private List<SelectItemModel> CategoryOptions_;
+        /// <summary>
+        /// 分类筛选选项（全部/未分类/具体分类）
+        /// </summary>
+        public List<SelectItemModel> CategoryOptions
+        {
+            get { return CategoryOptions_; }
+            set { CategoryOptions_ = value; OnPropertyChanged(); }
+        }
+
+        private SelectItemModel SelectedCategory_;
+        /// <summary>
+        /// 当前分类筛选
+        /// </summary>
+        public SelectItemModel SelectedCategory
+        {
+            get { return SelectedCategory_; }
+            set { SelectedCategory_ = value; OnPropertyChanged(); }
+        }
     }
 }

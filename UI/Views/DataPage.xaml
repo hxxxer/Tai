@@ -50,7 +50,14 @@
                         <RowDefinition Height="*"/>
 
                     </Grid.RowDefinitions>
-                    <select:DateSelect Date="{Binding DayDate,Mode=TwoWay}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="240"/>
+                        </Grid.ColumnDefinitions>
+                        <select:DateSelect Date="{Binding DayDate,Mode=TwoWay}"/>
+                        <select:Select Grid.Column="1" Margin="10,0,0,0" IsShowIcon="False" Padding="10,0" Height="35" VerticalAlignment="Center" ToolTip="分类筛选" SelectedItem="{Binding SelectedCategory,Mode=TwoWay}" Options="{Binding CategoryOptions}"/>
+                    </Grid>
                     <!--<DatePickerBar:DatePickerBar SelectedDate="{Binding DayDate,Mode=TwoWay}" ShowType="Day"/>-->
 
                     <Charts:Charts IsShowBadge="True"  IsSearch="True" Grid.Row="1" ItemMenu="{Binding AppContextMenu}" Data="{Binding Data}" ChartsType="List" Margin="0,20,0,0" ClickCommand="{Binding ToDetailCommand}"/>
@@ -64,7 +71,14 @@
 
                     </Grid.RowDefinitions>
                     <!--<DatePickerBar:DatePickerBar SelectedDate="{Binding MonthDate,Mode=TwoWay}" ShowType="Month"/>-->
-                    <select:DateSelect Date="{Binding MonthDate,Mode=TwoWay}" SelectType="Month"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="240"/>
+                        </Grid.ColumnDefinitions>
+                        <select:DateSelect Date="{Binding MonthDate,Mode=TwoWay}" SelectType="Month"/>
+                        <select:Select Grid.Column="1" Margin="10,0,0,0" IsShowIcon="False" Padding="10,0" Height="35" VerticalAlignment="Center" ToolTip="分类筛选" SelectedItem="{Binding SelectedCategory,Mode=TwoWay}" Options="{Binding CategoryOptions}"/>
+                    </Grid>
                     <Charts:Charts IsShowBadge="True" IsSearch="True" Grid.Row="1" ItemMenu="{Binding AppContextMenu}" Data="{Binding MonthData}" ChartsType="List" Margin="0,20,0,0" ClickCommand="{Binding ToDetailCommand}"/>
                 </Grid>
             </TabItem>
@@ -76,7 +90,14 @@
 
                     </Grid.RowDefinitions>
                     <!--<DatePickerBar:DatePickerBar SelectedDate="{Binding YearDate,Mode=TwoWay}" ShowType="Year"/>-->
-                    <select:DateSelect Date="{Binding YearDate,Mode=TwoWay}" SelectType="Year"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="240"/>
+                        </Grid.ColumnDefinitions>
+                        <select:DateSelect Date="{Binding YearDate,Mode=TwoWay}" SelectType="Year"/>
+                        <select:Select Grid.Column="1" Margin="10,0,0,0" IsShowIcon="False" Padding="10,0" Height="35" VerticalAlignment="Center" ToolTip="分类筛选" SelectedItem="{Binding SelectedCategory,Mode=TwoWay}" Options="{Binding CategoryOptions}"/>
+                    </Grid>
 
                     <Charts:Charts IsShowBadge="True" IsSearch="True" Grid.Row="1" ItemMenu="{Binding AppContextMenu}" Data="{Binding YearData}" ChartsType="List" Margin="0,20,0,0" ClickCommand="{Binding ToDetailCommand}"/>
                 </Grid>
