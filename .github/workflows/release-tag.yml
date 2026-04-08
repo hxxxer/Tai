@@ -1,0 +1,121 @@
+name: Release from Tag
+
+on:
+  # 只有推送语义化版本 tag 时才触发自动发布
+  # 示例：v1.2.3
+  push:
+    tags:
+      - 'v*.*.*'
+
+# 需要写权限来创建 Release 和上传附件
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Release (tag)
+    runs-on: windows-latest
+
+    steps:
+      # 拉取代码和 tag 信息
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 安装 NuGet（packages.config 依赖恢复必备）
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      # 安装 MSBuild
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # 解析当前 tag，后续用于命名 zip 和 Release
+      - name: Resolve tag name
+        id: vars
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag) {
+            throw 'Unable to resolve tag name from github.ref_name'
+          }
+
+          # 二次校验格式，避免误触发脏 tag
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Tag '$tag' does not match required format vX.Y.Z"
+          }
+
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      # 恢复依赖
+      - name: Restore NuGet packages
+        run: nuget restore Tai.sln
+
+      # 构建解决方案
+      - name: Build solution
+        run: msbuild Tai.sln /m /p:Configuration=Release /p:Platform=x64
+
+      # 组装发布目录并打包
+      - name: Assemble release package
+        id: pack
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $tag = '${{ steps.vars.outputs.tag }}'
+          $stagingDir = 'release_staging'
+          $zipDir = 'release_artifacts'
+          $zipName = "Tai-$tag-win-x64.zip"
+
+          # 清理旧目录
+          Remove-Item -Recurse -Force $stagingDir -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force $zipDir -ErrorAction SilentlyContinue
+
+          New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $zipDir | Out-Null
+
+          # 1) 主程序（UI）产物
+          $uiOutput = 'UI/bin/x64/Release'
+          if (-not (Test-Path $uiOutput)) {
+            throw "UI build output not found: $uiOutput"
+          }
+          Copy-Item "$uiOutput/*" $stagingDir -Recurse -Force
+
+          # 2) Updater 可执行文件（如果存在则打包）
+          $updaterExe = 'Updater/bin/x64/Release/Updater.exe'
+          if (Test-Path $updaterExe) {
+            Copy-Item $updaterExe $stagingDir -Force
+          }
+
+          # 3) TaiBug 可执行文件（如果存在则打包）
+          $taiBugExe = 'TaiBug/bin/Release/TaiBug.exe'
+          if (Test-Path $taiBugExe) {
+            Copy-Item $taiBugExe $stagingDir -Force
+          }
+
+          # 4) 可选附带浏览器扩展目录，方便用户离线安装
+          if (Test-Path 'WebExtensions/Chrome') {
+            Copy-Item 'WebExtensions/Chrome' "$stagingDir/WebExtensions/Chrome" -Recurse -Force
+          }
+
+          # 5) 附带基础说明文档（如存在）
+          foreach ($doc in @('README.md', 'LICENSE', 'privacy.txt')) {
+            if (Test-Path $doc) {
+              Copy-Item $doc $stagingDir -Force
+            }
+          }
+
+          # 打包最终发布文件
+          $zipPath = Join-Path $zipDir $zipName
+          Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipPath -Force
+
+          "zip_path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "zip_name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      # 自动创建 GitHub Release 并上传 zip 附件
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: Tai ${{ steps.vars.outputs.tag }}
+          generate_release_notes: true
+          files: ${{ steps.pack.outputs.zip_path }}
