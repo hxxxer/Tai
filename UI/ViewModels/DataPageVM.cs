@@ -1,6 +1,7 @@
 ﻿using Core.Librarys;
 using Core.Librarys.Image;
 using Core.Models;
+using Core.Models.Db;
 using Core.Servicers.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,7 @@ using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 using UI.Controls;
 using UI.Controls.Charts.Model;
+using UI.Controls.Select;
 using UI.Models;
 using UI.Servicers;
 using UI.Views;
@@ -28,8 +30,11 @@ namespace UI.ViewModels
         private readonly IAppConfig appConfig;
         private readonly IWebData _webData;
         private readonly IWebSiteContextMenuServicer _webSiteContextMenu;
+        private readonly ICategorys _categorys;
+        private const int CategoryFilterAll = -1;
+        private const int CategoryFilterUncategorized = 0;
 
-        public DataPageVM(IData data, MainViewModel main, IAppContextMenuServicer appContextMenuServicer, IAppConfig appConfig, IWebData webData, IWebSiteContextMenuServicer webSiteContextMenu)
+        public DataPageVM(IData data, MainViewModel main, IAppContextMenuServicer appContextMenuServicer, IAppConfig appConfig, IWebData webData, IWebSiteContextMenuServicer webSiteContextMenu, ICategorys categorys)
         {
             this.data = data;
             this.main = main;
@@ -37,6 +42,7 @@ namespace UI.ViewModels
             this.appConfig = appConfig;
             _webData = webData;
             _webSiteContextMenu = webSiteContextMenu;
+            _categorys = categorys;
 
             ToDetailCommand = new Command(new Action<object>(OnTodetailCommand));
 
@@ -62,6 +68,7 @@ namespace UI.ViewModels
             TabbarSelectedIndex = 0;
 
             AppContextMenu = appContextMenuServicer.GetContextMenu();
+            LoadCategoryOptions();
         }
 
         private void OnTodetailCommand(object obj)
@@ -126,9 +133,6 @@ namespace UI.ViewModels
             }
             else if (e.PropertyName == nameof(ShowType))
             {
-                LoadData(DayDate, 0);
-                LoadData(MonthDate, 1);
-                LoadData(YearDate, 2);
                 if (ShowType.Id == 0)
                 {
                     AppContextMenu = appContextMenuServicer.GetContextMenu();
@@ -137,10 +141,91 @@ namespace UI.ViewModels
                 {
                     AppContextMenu = _webSiteContextMenu.GetContextMenu();
                 }
+
+                // 展示类型切换时重建分类筛选，并回到“全部”
+                LoadCategoryOptions();
+                LoadData(DayDate, 0);
+                LoadData(MonthDate, 1);
+                LoadData(YearDate, 2);
+            }
+            else if (e.PropertyName == nameof(SelectedCategory))
+            {
+                // 分类筛选变化时，仅刷新当前分页对应的数据
+                ReloadCurrentTabData();
             }
         }
 
 
+
+        /// <summary>
+        /// 读取分类筛选项。
+        /// - 应用模式：读取应用分类
+        /// - 网站模式：读取网站分类
+        /// </summary>
+        private void LoadCategoryOptions()
+        {
+            var options = new List<SelectItemModel>
+            {
+                new SelectItemModel()
+                {
+                    Id = CategoryFilterAll,
+                    Name = "全部"
+                },
+                new SelectItemModel()
+                {
+                    Id = CategoryFilterUncategorized,
+                    Name = "未分类"
+                }
+            };
+
+            if (ShowType.Id == 0)
+            {
+                // 应用分类
+                foreach (var item in _categorys.GetCategories())
+                {
+                    options.Add(new SelectItemModel()
+                    {
+                        Id = item.ID,
+                        Name = item.Name,
+                        Img = item.IconFile,
+                        Data = item
+                    });
+                }
+            }
+            else
+            {
+                // 网站分类
+                foreach (var item in _webData.GetWebSiteCategories())
+                {
+                    options.Add(new SelectItemModel()
+                    {
+                        Id = item.ID,
+                        Name = item.Name,
+                        Img = item.IconFile,
+                        Data = item
+                    });
+                }
+            }
+
+            CategoryOptions = options;
+            SelectedCategory = CategoryOptions.FirstOrDefault();
+        }
+
+        private void ReloadCurrentTabData()
+        {
+            if (TabbarSelectedIndex == 0)
+            {
+                LoadData(DayDate);
+            }
+            else if (TabbarSelectedIndex == 1)
+            {
+                LoadData(MonthDate);
+            }
+            else
+            {
+                LoadData(YearDate);
+            }
+        }
 
         #region 读取数据
 
@@ -175,12 +260,14 @@ namespace UI.ViewModels
                 if (ShowType.Id == 0)
                 {
                     var result = data.GetDateRangelogList(dateStart, dateEnd);
+                    result = FilterAppLogsByCategory(result);
                     chartData = MapToChartsData(result);
                 }
                 else
                 {
                     var result = _webData.GetWebSiteLogList(dateStart, dateEnd);
-                    chartData = MapToChartsWebData(result);
+                    var filterResult = FilterWebSitesByCategory(result);
+                    chartData = MapToChartsWebData(filterResult);
                 }
 
 
@@ -198,6 +285,42 @@ namespace UI.ViewModels
                 }
 
             });
+        }
+
+        /// <summary>
+        /// 根据当前分类筛选过滤应用统计列表。
+        /// </summary>
+        private IEnumerable<DailyLogModel> FilterAppLogsByCategory(IEnumerable<DailyLogModel> source_)
+        {
+            if (SelectedCategory == null || SelectedCategory.Id == CategoryFilterAll)
+            {
+                return source_;
+            }
+
+            if (SelectedCategory.Id == CategoryFilterUncategorized)
+            {
+                return source_.Where(m => m.AppModel == null || m.AppModel.CategoryID == 0 || m.AppModel.Category == null);
+            }
+
+            return source_.Where(m => m.AppModel != null && m.AppModel.CategoryID == SelectedCategory.Id);
+        }
+
+        /// <summary>
+        /// 根据当前分类筛选过滤网站统计列表。
+        /// </summary>
+        private IEnumerable<WebSiteModel> FilterWebSitesByCategory(IEnumerable<WebSiteModel> source_)
+        {
+            if (SelectedCategory == null || SelectedCategory.Id == CategoryFilterAll)
+            {
+                return source_;
+            }
+
+            if (SelectedCategory.Id == CategoryFilterUncategorized)
+            {
+                return source_.Where(m => m.CategoryID == 0 || m.Category == null);
+            }
+
+            return source_.Where(m => m.CategoryID == SelectedCategory.Id);
         }
 
         #region 处理数据
